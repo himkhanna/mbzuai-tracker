@@ -1,0 +1,23 @@
+node_modules
+.env
+/generated/prisma
+
+# Build artifacts
+server-java/target/
+client/dist/
+
+# Runtime / DB
+dev.db
+*.db
+
+# Archives
+server-java.zip
+
+# IDE / OS
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Claude memory (local only)
+.claude/

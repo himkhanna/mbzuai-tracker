@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  password      String
+  role          String
+  department    String?
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  auditLogs     AuditLog[]
+  notifications Notification[]
+}
+
+model Order {
+  id              String    @id @default(cuid())
+  type            String
+  reference       String    @unique
+  vendor          String
+  supplier        String?
+  deliveryAddress String?
+  endUser         String
+  department      String?
+  orderDate       DateTime
+  totalValue      Float?
+  currency        String    @default("AED")
+  status          String    @default("PENDING")
+  notes            String?
+  isDeleted        Boolean   @default(false)
+  vendorPlatform   String?
+  vendorOrderId    String?
+  vendorSyncData   String?
+  vendorLastSynced DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  items            Item[]
+  auditLogs        AuditLog[]
+}
+
+model Item {
+  id                   String     @id @default(cuid())
+  orderId              String
+  order                Order      @relation(fields: [orderId], references: [id])
+  itemCategory         String?
+  description          String
+  quantity             Int
+  quantityReceived     Int?
+  unitPrice            Float?
+  totalPrice           Float?
+  purchaseLink         String?
+  lineNumber           String?
+  goodType             String     @default("GOODS")
+  requisitionNumber    String?
+  expectedDeliveryDate DateTime?
+  receivedDate         DateTime?
+  storedDate           DateTime?
+  assetTaggingDate     DateTime?
+  itConfigDate         DateTime?
+  handoverDate         DateTime?
+  customClearanceDate  DateTime?
+  requiresAssetTagging Boolean    @default(false)
+  requiresITConfig     Boolean    @default(false)
+  status               String     @default("PENDING_DELIVERY")
+  financeRemarks       String?
+  finalRemarks         String?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  auditLogs            AuditLog[]
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  relatedId String?
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  fieldName  String?
+  oldValue   String?
+  newValue   String?
+  timestamp  DateTime @default(now())
+  orderId    String?
+  order      Order?   @relation(fields: [orderId], references: [id])
+  itemId     String?
+  item       Item?    @relation(fields: [itemId], references: [id])
+}

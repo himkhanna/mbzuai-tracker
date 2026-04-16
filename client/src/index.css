@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+/* ─── MBZUAI Official Brand Colors ────────────────────────────────────────── */
+/* Source: https://mbzuai.ac.ae/                                               */
+/* Primary navy (buttons, primary actions): #154677                            */
+/* Deep navy (sidebar/footer): #0C2945                                         */
+/* Gold (header accent): #E5C687                                               */
+/* Blue (links/digital): #0081FB                                               */
+
+@theme {
+  /* Override Tailwind blue → MBZUAI primary navy for buttons */
+  --color-blue-50:  #e8eef5;
+  --color-blue-100: #c9d9ec;
+  --color-blue-200: #9abbd9;
+  --color-blue-300: #6a9dc6;
+  --color-blue-400: #3b80b3;
+  --color-blue-500: #0081FB;
+  --color-blue-600: #154677;
+  --color-blue-700: #0C2945;
+  --color-blue-800: #091f38;
+  --color-blue-900: #06152a;
+  --color-blue-950: #030d1c;
+}
+
+/* ─── CSS custom properties for MBZUAI brand ──────────────────────────────── */
+:root {
+  --mbzuai-gold:       #E5C687;
+  --mbzuai-gold-dark:  #c9a85c;
+  --mbzuai-gold-light: #f2dfa9;
+  --mbzuai-navy:       #0C2945;
+  --mbzuai-navy-mid:   #154677;
+  --mbzuai-blue:       #0081FB;
+  --mbzuai-dark-text:  #08142A;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Work Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background-color: #f0f4f8;
+  color: #08142A;
+  -webkit-font-smoothing: antialiased;
+}
+
+html[lang="ar"] body {
+  font-family: 'Work Sans', 'Noto Kufi Arabic', Tahoma, sans-serif;
+}
+
+#root { width: 100%; }
+
+/* Visible scrollbars for overflow containers */
+.overflow-x-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #c9d9ec #f0f4f8;
+}
+.overflow-x-auto::-webkit-scrollbar { height: 6px; }
+.overflow-x-auto::-webkit-scrollbar-track { background: #f0f4f8; }
+.overflow-x-auto::-webkit-scrollbar-thumb { background-color: #c9d9ec; border-radius: 3px; }
+.overflow-x-auto::-webkit-scrollbar-thumb:hover { background-color: #9abbd9; }
+
+.pb-1.overflow-x-auto::-webkit-scrollbar { height: 4px; }
+.pb-1.overflow-x-auto::-webkit-scrollbar-thumb { background-color: #e2e8f0; border-radius: 2px; }
