@@ -79,6 +79,7 @@ export interface Order {
   currency: string;
   status: OrderStatus;
   notes?: string;
+  orderCategory?: string; // GOODS | SERVICES
   vendorPlatform?: string;
   vendorOrderId?: string;
   vendorSyncData?: string;

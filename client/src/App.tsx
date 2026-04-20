@@ -13,6 +13,8 @@ import OrderDetail from './pages/OrderDetail';
 import Reports from './pages/Reports';
 import UserManagement from './pages/UserManagement';
 import AuditLog from './pages/AuditLog';
+import TestTools from './pages/TestTools';
+import Settings from './pages/Settings';
 import type { Role } from './types';
 
 function Layout({ children, title }: { children: React.ReactNode; title: string }) {
@@ -93,6 +95,16 @@ function AppRoutes() {
       <Route path="/admin/audit" element={
         <ProtectedRoute title="Audit Log" allowedRoles={['ADMIN', 'VENDOR_MANAGEMENT']}>
           <AuditLog />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/test-tools" element={
+        <ProtectedRoute title="Test Tools" allowedRoles={['ADMIN']}>
+          <TestTools />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/settings" element={
+        <ProtectedRoute title="Settings" allowedRoles={['ADMIN']}>
+          <Settings />
         </ProtectedRoute>
       } />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

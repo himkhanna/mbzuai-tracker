@@ -25,6 +25,9 @@ public class OrderDto {
     private String currency;
     private String status;
     private String notes;
+    private String orderCategory;
+    private String vendorPlatform;
+    private String vendorOrderId;
     @JsonProperty("isDeleted")
     private boolean isDeleted;
     private Instant createdAt;
@@ -50,6 +53,9 @@ public class OrderDto {
                 .currency(o.getCurrency())
                 .status(o.getStatus())
                 .notes(o.getNotes())
+                .orderCategory(o.getOrderCategory())
+                .vendorPlatform(o.getVendorPlatform())
+                .vendorOrderId(o.getVendorOrderId())
                 .isDeleted(o.isDeleted())
                 .createdAt(o.getCreatedAt())
                 .updatedAt(o.getUpdatedAt());

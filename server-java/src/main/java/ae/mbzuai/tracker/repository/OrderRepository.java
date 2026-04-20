@@ -11,4 +11,5 @@ public interface OrderRepository extends JpaRepository<Order, String>, JpaSpecif
     Optional<Order> findByReferenceAndIsDeleted(String reference, boolean isDeleted);
     Optional<Order> findByIdAndIsDeleted(String id, boolean isDeleted);
     Page<Order> findAllByIsDeleted(boolean isDeleted, Pageable pageable);
+    Optional<Order> findByVendorOrderId(String vendorOrderId);
 }

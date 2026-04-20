@@ -77,6 +77,9 @@ public class OrderService {
                 .totalValue(req.getTotalValue())
                 .currency(req.getCurrency() != null ? req.getCurrency() : "AED")
                 .notes(req.getNotes())
+                .orderCategory(req.getOrderCategory() != null ? req.getOrderCategory() : "GOODS")
+                .vendorPlatform(req.getVendorPlatform())
+                .vendorOrderId(req.getVendorOrderId())
                 .status("PENDING")
                 .build();
 
@@ -118,6 +121,9 @@ public class OrderService {
         if (req.getDepartment() != null) order.setDepartment(req.getDepartment());
         if (req.getNotes() != null) order.setNotes(req.getNotes());
         if (req.getTotalValue() != null) order.setTotalValue(req.getTotalValue());
+        if (req.getVendorOrderId() != null) order.setVendorOrderId(req.getVendorOrderId().isBlank() ? null : req.getVendorOrderId());
+        if (req.getVendorPlatform() != null) order.setVendorPlatform(req.getVendorPlatform().isBlank() ? null : req.getVendorPlatform());
+        if (req.getOrderCategory() != null && !req.getOrderCategory().isBlank()) order.setOrderCategory(req.getOrderCategory());
 
         auditService.log(actor, "order", order.getId(), "UPDATE");
         return OrderDto.from(orderRepository.save(order));

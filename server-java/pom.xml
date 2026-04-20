@@ -97,18 +97,31 @@
       <version>5.3.0</version>
     </dependency>
 
-    <!-- Jakarta Mail (IMAP ingestion) -->
+    <!-- Microsoft Graph SDK (O365 mailbox ingestion) -->
     <dependency>
-      <groupId>com.sun.mail</groupId>
-      <artifactId>jakarta.mail</artifactId>
-      <version>2.0.1</version>
+      <groupId>com.microsoft.graph</groupId>
+      <artifactId>microsoft-graph</artifactId>
+      <version>6.21.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.azure</groupId>
+      <artifactId>azure-identity</artifactId>
+      <version>1.14.2</version>
     </dependency>
 
-    <!-- Apache PDFBox (PDF export) -->
+    <!-- Apache PDFBox (PDF generation + text extraction) -->
     <dependency>
       <groupId>org.apache.pdfbox</groupId>
       <artifactId>pdfbox</artifactId>
       <version>3.0.3</version>
+    </dependency>
+
+    <!-- Tess4J — Tesseract OCR wrapper for Amazon screenshot reading (free, open-source) -->
+    <!-- Requires Tesseract installed: https://github.com/UB-Mannheim/tesseract/wiki (Windows) -->
+    <dependency>
+      <groupId>net.sourceforge.tess4j</groupId>
+      <artifactId>tess4j</artifactId>
+      <version>5.11.0</version>
     </dependency>
 
     <!-- BCrypt (password hashing) -->

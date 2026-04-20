@@ -43,6 +43,7 @@ export default function CreateOrder() {
   const [currency, setCurrency] = useState('AED');
   const [totalValue, setTotalValue] = useState('');
 
+  const [orderCategory, setOrderCategory] = useState<'GOODS' | 'SERVICES'>('GOODS');
   const [vendorPlatform, setVendorPlatform] = useState('');
   const [vendorOrderId, setVendorOrderId] = useState('');
 
@@ -102,6 +103,7 @@ export default function CreateOrder() {
         notes: notes || undefined,
         currency,
         totalValue: totalValue ? parseFloat(totalValue) : undefined,
+        orderCategory,
         vendorPlatform: vendorPlatform || undefined,
         vendorOrderId: vendorOrderId || undefined,
         items: items.map((it) => ({
@@ -126,17 +128,37 @@ export default function CreateOrder() {
       <h2 className="text-lg font-semibold text-gray-800">Create New Order</h2>
 
       {/* Type Toggle */}
-      <div className="flex gap-2">
-        {(['PO', 'DP'] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setOrderType(t)}
-            className={`px-5 py-2 rounded-lg text-sm font-medium border transition-colors ${orderType === t ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
-          >
-            {t === 'PO' ? 'Purchase Order (PO)' : 'Direct Payment (DP)'}
-          </button>
-        ))}
+      <div className="flex flex-wrap gap-4 items-center">
+        <div className="flex gap-2">
+          {(['PO', 'DP'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setOrderType(t)}
+              className={`px-5 py-2 rounded-lg text-sm font-medium border transition-colors ${orderType === t ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+            >
+              {t === 'PO' ? 'Purchase Order (PO)' : 'Direct Payment (DP)'}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 px-4 py-1.5 bg-white border border-gray-200 rounded-lg">
+          <span className="text-xs font-medium text-gray-500 mr-1">Order Category:</span>
+          {(['GOODS', 'SERVICES'] as const).map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setOrderCategory(cat)}
+              className={`px-3 py-1 rounded text-xs font-semibold border transition-colors ${orderCategory === cat
+                ? cat === 'GOODS' ? 'bg-green-600 text-white border-green-600' : 'bg-purple-600 text-white border-purple-600'
+                : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}`}
+            >
+              {cat}
+            </button>
+          ))}
+          {orderCategory === 'SERVICES' && (
+            <span className="text-xs text-purple-600 ml-1">(not tracked for delivery)</span>
+          )}
+        </div>
       </div>
 
       {/* Excel Import */}
@@ -185,7 +207,7 @@ export default function CreateOrder() {
                 {orderType} Reference *
               </label>
               <input required value={reference} onChange={(e) => setReference(e.target.value)}
-                placeholder={orderType === 'PO' ? 'PO-2024-001' : 'DP-2024-001'}
+                placeholder={orderType === 'PO' ? 'PO-2243' : 'DP-2226'}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div>

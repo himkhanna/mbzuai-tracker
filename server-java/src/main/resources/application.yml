@@ -53,11 +53,19 @@ app:
     timezone: ${CRON_TIMEZONE:Asia/Dubai}
   email-ingestion:
     enabled: ${ENABLE_EMAIL_INGESTION:false}
-    imap-host: ${IMAP_HOST:imap.mbzuai.ac.ae}
-    imap-port: ${IMAP_PORT:993}
-    imap-user: ${IMAP_USER:receiver@mbzuai.ac.ae}
-    imap-pass: ${IMAP_PASS:}
-    poll-interval-minutes: ${IMAP_POLL_INTERVAL:10}
+    # Microsoft Graph / Azure AD app credentials
+    azure-tenant-id: ${AZURE_TENANT_ID:}
+    azure-client-id: ${AZURE_CLIENT_ID:}
+    azure-client-secret: ${AZURE_CLIENT_SECRET:}
+    # The O365 mailbox to monitor (email address)
+    mailbox: ${GRAPH_MAILBOX:po-orders@mbzuai.ac.ae}
+    poll-interval-ms: ${IMAP_POLL_MS:600000}   # 10 minutes
+  ocr:
+    enabled: ${OCR_ENABLED:true}
+    # Path to Tesseract tessdata directory.
+    # Windows default after installing from https://github.com/UB-Mannheim/tesseract/wiki
+    # Linux/Mac: /usr/share/tesseract-ocr/4.00/tessdata
+    tesseract-data-path: ${TESSERACT_DATA:C:/Program Files/Tesseract-OCR/tessdata}
 
 logging:
   level:

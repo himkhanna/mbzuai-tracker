@@ -3,7 +3,9 @@ package ae.mbzuai.tracker.scheduler;
 import ae.mbzuai.tracker.entity.Item;
 import ae.mbzuai.tracker.repository.ItemRepository;
 import ae.mbzuai.tracker.repository.OrderRepository;
+import ae.mbzuai.tracker.service.EmailIngestionService;
 import ae.mbzuai.tracker.service.NotificationService;
+import ae.mbzuai.tracker.service.SettingsService;
 import ae.mbzuai.tracker.service.StatusCalculator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -23,6 +26,10 @@ public class DeliveryScheduler {
     private final OrderRepository orderRepository;
     private final NotificationService notificationService;
     private final StatusCalculator statusCalculator;
+    private final EmailIngestionService emailIngestionService;
+    private final SettingsService settingsService;
+
+    private Instant lastEmailPoll = Instant.EPOCH;
 
     // Daily at 07:00 AM Asia/Dubai — delivery due today
     @Scheduled(cron = "0 0 7 * * *", zone = "Asia/Dubai")
@@ -48,6 +55,21 @@ public class DeliveryScheduler {
                 itemRepository.save(item);
             }
             notificationService.onDeliveryOverdue(item);
+        }
+    }
+
+    // Runs every 60 seconds; actual email check frequency is controlled by the
+    // "email.poll.interval.minutes" setting — configurable at runtime via Settings UI.
+    @Scheduled(fixedDelay = 60_000, initialDelay = 60_000)
+    public void pollEmail() {
+        long intervalMs = settingsService.getPollIntervalMs();
+        if (Instant.now().isBefore(lastEmailPoll.plusMillis(intervalMs))) return;
+        lastEmailPoll = Instant.now();
+        var result = emailIngestionService.checkInbox();
+        if (result.getEmailsProcessed() > 0 || result.getErrors() > 0) {
+            log.info("Email poll: {} emails, {} orders, {} items, {} Amazon updates, {} errors",
+                    result.getEmailsProcessed(), result.getOrdersCreated(),
+                    result.getItemsCreated(), result.getAmazonUpdates(), result.getErrors());
         }
     }
 }

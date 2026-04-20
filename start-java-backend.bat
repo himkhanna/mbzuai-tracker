@@ -37,6 +37,11 @@ java ^
   -Dspring.thymeleaf.check-template-location=false ^
   -Dspring.jpa.open-in-view=false ^
   -Dlogging.level.ae.mbzuai=INFO ^
+  -Dapp.email-ingestion.enabled=true ^
+  -Dapp.email-ingestion.azure-tenant-id=YOUR_AZURE_TENANT_ID ^
+  -Dapp.email-ingestion.azure-client-id=YOUR_AZURE_CLIENT_ID ^
+  -Dapp.email-ingestion.azure-client-secret=YOUR_AZURE_CLIENT_SECRET ^
+  -Dapp.email-ingestion.mailbox=YOUR_MAILBOX@yourdomain.com ^
   -jar target\tracker-1.0.0.jar
 
 pause

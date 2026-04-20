@@ -39,6 +39,8 @@
 mbzuai-tracker/
 ├── CLAUDE.md
 ├── start-java-backend.bat          ← double-click to start backend
+├── db/
+│   └── migrations.sql              ← manual DB migration scripts
 ├── server-java/                    ← ACTIVE backend (Spring Boot)
 │   ├── pom.xml
 │   ├── src/main/
@@ -56,13 +58,15 @@ mbzuai-tracker/
 │   │   │   │   ├── Order.java
 │   │   │   │   ├── Item.java
 │   │   │   │   ├── Notification.java
-│   │   │   │   └── AuditLog.java
+│   │   │   │   ├── AuditLog.java
+│   │   │   │   └── AppSetting.java          ← runtime config key-value store
 │   │   │   ├── repository/
 │   │   │   │   ├── UserRepository.java
 │   │   │   │   ├── OrderRepository.java
 │   │   │   │   ├── ItemRepository.java
 │   │   │   │   ├── NotificationRepository.java
-│   │   │   │   └── AuditLogRepository.java
+│   │   │   │   ├── AuditLogRepository.java
+│   │   │   │   └── AppSettingRepository.java
 │   │   │   ├── service/
 │   │   │   │   ├── AuthService.java
 │   │   │   │   ├── OrderService.java
@@ -71,7 +75,11 @@ mbzuai-tracker/
 │   │   │   │   ├── NotificationService.java
 │   │   │   │   ├── AuditService.java
 │   │   │   │   ├── ImportService.java
-│   │   │   │   └── StatusCalculator.java
+│   │   │   │   ├── StatusCalculator.java
+│   │   │   │   ├── SettingsService.java     ← runtime settings read/write
+│   │   │   │   ├── EmailIngestionService.java
+│   │   │   │   ├── AmazonScreenshotService.java
+│   │   │   │   └── PdfPoParser.java
 │   │   │   ├── controller/
 │   │   │   │   ├── AuthController.java
 │   │   │   │   ├── OrderController.java
@@ -80,14 +88,18 @@ mbzuai-tracker/
 │   │   │   │   ├── NotificationController.java
 │   │   │   │   ├── AuditController.java
 │   │   │   │   ├── ReportController.java
-│   │   │   │   └── ImportController.java
+│   │   │   │   ├── ImportController.java
+│   │   │   │   └── SettingsController.java  ← GET/PUT /api/settings
 │   │   │   ├── dto/
 │   │   │   │   ├── LoginRequest.java / LoginResponse.java
 │   │   │   │   ├── UserDto.java / UserRequest.java
 │   │   │   │   ├── OrderDto.java / OrderRequest.java
 │   │   │   │   ├── ItemDto.java / ItemRequest.java
 │   │   │   │   ├── AuditLogDto.java
-│   │   │   │   └── ChangePasswordRequest.java
+│   │   │   │   ├── ChangePasswordRequest.java
+│   │   │   │   └── EmailImportResult.java
+│   │   │   ├── util/
+│   │   │   │   └── SamplePdfGenerator.java
 │   │   │   └── scheduler/
 │   │   │       └── DeliveryScheduler.java
 │   │   └── resources/
@@ -95,7 +107,7 @@ mbzuai-tracker/
 │   └── target/
 │       └── tracker-1.0.0.jar       ← built JAR
 ├── server/                         ← OLD Node.js backend (do not use)
-├── client/                         ← Frontend (unchanged)
+├── client/                         ← Frontend
 │   ├── src/
 │   │   ├── main.tsx
 │   │   ├── App.tsx
@@ -112,13 +124,15 @@ mbzuai-tracker/
 │   │   │   ├── CreateOrder.tsx
 │   │   │   ├── Reports.tsx
 │   │   │   ├── UserManagement.tsx
-│   │   │   └── AuditLog.tsx
+│   │   │   ├── AuditLog.tsx
+│   │   │   ├── TestTools.tsx        ← Admin test tool (PDF download, Amazon screenshot, email check)
+│   │   │   └── Settings.tsx         ← Admin settings (email ingestion config)
 │   │   └── components/
 │   │       ├── layout/ (Sidebar, Navbar, NotificationBell)
 │   │       ├── tracker/ (OrderTable, ItemLifecycleRow, StatusBadge, FilterBar)
 │   │       ├── dashboard/ (KPICard, StatusChart, DelayAlert)
 │   │       ├── forms/ (POForm, DPForm, LineItemForm)
-│   │       └── shared/ (DatePicker, ExportButton, ConfirmDialog)
+│   │       └── shared/ (DatePicker, ExportButton, ConfirmDialog, EditOrderModal)
 │   └── vite.config.ts              ← proxies /api → localhost:3001
 └── prisma/                         ← OLD Prisma schema (reference only)
 ```
@@ -127,7 +141,8 @@ mbzuai-tracker/
 
 ## Database Schema (JPA / PostgreSQL)
 
-Tables are auto-created by Hibernate (`ddl-auto: update`).
+Tables are auto-created by Hibernate (`ddl-auto: update`).  
+**New columns added after initial schema must be applied manually — see [DB Migration Scripts](#db-migration-scripts) below.**
 
 ### Users table
 
@@ -159,7 +174,12 @@ Tables are auto-created by Hibernate (`ddl-auto: update`).
 | total_value | DOUBLE | nullable |
 | currency | VARCHAR | default AED |
 | status | VARCHAR | PENDING \| PARTIALLY_DELIVERED \| FULLY_DELIVERED \| COMPLETED \| DELAYED |
+| order_category | VARCHAR | **GOODS \| SERVICES** — default GOODS; SERVICES orders skipped by email ingestion |
 | notes | TEXT | nullable |
+| vendor_platform | VARCHAR | nullable — e.g. AMAZON |
+| vendor_order_id | VARCHAR | nullable — e.g. Amazon order number for screenshot matching |
+| vendor_sync_data | TEXT | nullable |
+| vendor_last_synced | TIMESTAMP | nullable |
 | is_deleted | BOOLEAN | soft delete |
 | created_at | TIMESTAMP | |
 | updated_at | TIMESTAMP | |
@@ -180,7 +200,7 @@ Tables are auto-created by Hibernate (`ddl-auto: update`).
 | line_number | VARCHAR | nullable — from Oracle PO |
 | good_type | VARCHAR | GOODS \| SERVICES (default GOODS) |
 | requisition_number | VARCHAR | nullable |
-| expected_delivery_date | DATE | nullable |
+| expected_delivery_date | DATE | nullable — updated by Amazon screenshot OCR |
 | received_date | DATE | nullable |
 | stored_date | DATE | auto = received_date |
 | asset_tagging_date | DATE | nullable |
@@ -224,15 +244,59 @@ Tables are auto-created by Hibernate (`ddl-auto: update`).
 | order_id | UUID | nullable |
 | item_id | UUID | nullable |
 
+### App_settings table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| key | VARCHAR | PK — e.g. `email.mailbox` |
+| value | TEXT | current value |
+| description | TEXT | human-readable hint shown in Settings UI |
+
+**Default keys seeded on first use:**
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `email.enabled` | `false` | Enable/disable email polling |
+| `email.mailbox` | *(from app config)* | Mailbox address to monitor |
+| `email.poll.interval.minutes` | `10` | How often to check inbox |
+| `email.po.subjects` | `PO Order,Purchase Order,MBZUAI PO` | Subject keywords for PO emails |
+| `email.dp.subjects` | `DP Order,Direct Payment,MBZUAI DP` | Subject keywords for DP emails |
+| `email.amazon.subjects` | `Amazon Delivery,Amazon Order,Delivery Confirmation` | Subject keywords for Amazon emails |
+
+---
+
+## DB Migration Scripts
+
+Run these manually against PostgreSQL when the listed columns don't exist (Hibernate `ddl-auto: update` only adds columns on fresh tables, not existing ones).
+
+```sql
+-- File: db/migrations.sql
+-- Run with: psql -U postgres -p 5433 -d mbzuai_tracker -f db/migrations.sql
+
+-- 2026-04-20: vendor tracking fields on orders
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS vendor_platform    VARCHAR(50);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS vendor_order_id    VARCHAR(100);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS vendor_sync_data   TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS vendor_last_synced TIMESTAMP;
+
+-- 2026-04-20: order category (GOODS = physical delivery tracked, SERVICES = skip)
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_category VARCHAR(20) NOT NULL DEFAULT 'GOODS';
+
+-- 2026-04-20: runtime-configurable settings
+CREATE TABLE IF NOT EXISTS app_settings (
+    key         VARCHAR(100) PRIMARY KEY,
+    value       TEXT,
+    description TEXT
+);
+```
+
 ---
 
 ## Core Data Types (TypeScript — client/src/types/index.ts)
 
 ```typescript
 export type Role = 'ADMIN' | 'VENDOR_MANAGEMENT' | 'PROCUREMENT' | 'STORE' | 'FINANCE' | 'IT' | 'ASSET';
-
 export type OrderType = 'PO' | 'DP';
-
 export type GoodType = 'GOODS' | 'SERVICES';
 
 export type ItemStatus =
@@ -248,42 +312,6 @@ export type ItemStatus =
   | 'DELAYED'
   | 'SERVICES_ONLY';           // goodType = SERVICES — excluded from lifecycle
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: Role;
-  department?: string;
-  isActive: boolean;
-}
-
-export interface Item {
-  id: string;
-  orderId: string;
-  itemCategory?: string;
-  description: string;
-  quantity: number;
-  quantityReceived?: number;   // partial delivery tracking
-  unitPrice?: number;
-  totalPrice?: number;
-  purchaseLink?: string;
-  lineNumber?: string;         // from Oracle PO import
-  goodType: GoodType;          // GOODS | SERVICES
-  requisitionNumber?: string;
-  expectedDeliveryDate?: string;
-  receivedDate?: string;
-  storedDate?: string;
-  assetTaggingDate?: string;
-  itConfigDate?: string;
-  handoverDate?: string;
-  customClearanceDate?: string;
-  requiresAssetTagging: boolean;
-  requiresITConfig: boolean;
-  status: ItemStatus;
-  financeRemarks?: string;
-  finalRemarks?: string;
-}
-
 export interface Order {
   id: string;
   type: OrderType;
@@ -296,19 +324,12 @@ export interface Order {
   orderDate: string;
   totalValue?: number;
   currency: string;
-  status: string;
+  status: OrderStatus;
   notes?: string;
+  orderCategory?: string;    // GOODS | SERVICES
+  vendorPlatform?: string;   // e.g. AMAZON
+  vendorOrderId?: string;    // e.g. 114-3751791-7314618 — links Amazon screenshots
   items: Item[];
-}
-
-export interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  type: string;
-  isRead: boolean;
-  relatedId?: string;
-  createdAt: string;
 }
 ```
 
@@ -332,6 +353,8 @@ export interface Notification {
 | View Audit Logs | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Upload Excel Import | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Finance Remarks | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| Admin Settings | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Test Tools | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 > **IT and ASSET roles** have stage-limited access: they only see their specific action button (Mark IT Configured / Mark Asset Tagged) in the tracker. Sidebar shows a contextual message about their access scope.
 
@@ -379,6 +402,70 @@ DELAYED: today > expectedDeliveryDate AND item not yet received (overrides PENDI
 **Date clearing rules (privileged roles: ADMIN, PROCUREMENT, VENDOR_MANAGEMENT):**
 - Clearing `receivedDate` also clears `storedDate` and `quantityReceived`
 - Clearing any date causes status to recalculate backward automatically
+
+---
+
+## Order Category (GOODS vs SERVICES)
+
+Orders have an `orderCategory` field (GOODS | SERVICES, default GOODS):
+
+- **GOODS** — physical items, tracked through the full delivery lifecycle
+- **SERVICES** — software licenses, consulting, subscriptions — **skipped by email ingestion**
+
+This prevents pure-services PDFs (Microsoft licensing, consulting contracts, etc.) from cluttering the physical delivery tracker.
+
+**How it works:**
+- `SamplePdfGenerator` writes `Order Category: GOODS|SERVICES` into the PDF header
+- `PdfPoParser` reads `Order Category:` from the parsed text
+- `EmailIngestionService.createOrderFromParsed()` checks: if `orderCategory = SERVICES` → increment `servicesSkipped`, return without creating
+- `EmailImportResult` includes `servicesSkipped` count, shown in TestTools email result panel
+
+**UI:** CreateOrder and EditOrderModal both have a GOODS / SERVICES toggle button pair.
+
+---
+
+## Email Ingestion (Microsoft Graph / Office 365)
+
+Email ingestion polls an Office 365 mailbox via Microsoft Graph API for unread emails.
+
+### Azure credentials (application.yml / environment — not in DB)
+```yaml
+app:
+  email-ingestion:
+    azure-tenant-id:     ${AZURE_TENANT_ID:}
+    azure-client-id:     ${AZURE_CLIENT_ID:}
+    azure-client-secret: ${AZURE_CLIENT_SECRET:}
+```
+
+### Runtime settings (DB — configurable from Settings UI without restart)
+
+| Setting key | What it controls |
+|---|---|
+| `email.enabled` | Master on/off switch |
+| `email.mailbox` | Which O365 mailbox to read |
+| `email.poll.interval.minutes` | Check frequency (min 1 min) |
+| `email.po.subjects` | CSV keywords for PO emails |
+| `email.dp.subjects` | CSV keywords for DP emails |
+| `email.amazon.subjects` | CSV keywords for Amazon emails |
+
+### Processing flow per email
+1. Subject checked against all configured keywords — non-matching emails are marked read and skipped
+2. Body text scanned for Amazon order IDs and delivery dates
+3. Attachments processed:
+   - **PDF** → `PdfPoParser` → order auto-created (if `orderCategory = GOODS`)
+   - **Excel** → `ImportService` (existing PO/DP import logic)
+   - **Images** → `AmazonScreenshotService` (OCR for delivery dates)
+
+### Amazon screenshot delivery date matching
+`AmazonScreenshotService` parses OCR text into `ShipmentBlock` records:
+- Each `ShipmentBlock` = one "Arriving by DATE" line + its item descriptions
+- Each order item is matched to a block by substring/word-overlap of its description
+- Matched item gets `expectedDeliveryDate` updated to that block's date
+- Example: "Dell Latitude 5540 Laptop" in order matches "Dell Latitude 5540 Laptop 16GB 512GB" in OCR → gets May 20 date
+- Field updated: `Item.expectedDeliveryDate`
+
+### Dynamic poll interval
+`DeliveryScheduler.pollEmail()` runs every 60s but checks `lastEmailPoll` against DB-configured interval. Changing the interval in Settings UI takes effect within 1 minute — no restart needed.
 
 ---
 
@@ -431,6 +518,7 @@ Same triggers — stored in `notifications` table, surfaced via NotificationBell
 ### Scheduled Jobs (`@Scheduled` — Asia/Dubai timezone)
 - **Daily at 07:00 AM**: `findDueToday(today)` → send delivery-due notifications
 - **Daily at 08:00 AM**: `findOverdue(today)` → mark status `DELAYED` + send overdue notifications
+- **Every 60s**: `pollEmail()` → checks DB-configured interval before actually polling inbox
 
 ---
 
@@ -450,9 +538,9 @@ POST   /api/auth/reset-password
 ```
 GET    /api/orders              — returns { data: OrderDto[], meta: { total, page, size, totalPages } }
                                   query params: type, status, vendor, search, dateFrom, dateTo, page, size
-POST   /api/orders              — create PO or DP
+POST   /api/orders              — create PO or DP; body includes orderCategory (GOODS|SERVICES)
 GET    /api/orders/:id          — returns OrderDto with items[]
-PUT    /api/orders/:id          — update order header
+PUT    /api/orders/:id          — update order header (incl. orderCategory, vendorOrderId, vendorPlatform)
 DELETE /api/orders/:id          — soft delete (Admin only)
 ```
 
@@ -504,6 +592,42 @@ GET    /api/audit                   — returns { data: AuditLogDto[], total: N 
                                       (Admin + VENDOR_MANAGEMENT only)
 ```
 
+### Settings (Admin only)
+```
+GET    /api/settings                — returns Map<key, { value, description }>
+PUT    /api/settings                — body: Map<key, value>; updates multiple keys at once
+```
+
+### Admin / Test Tools (Admin only)
+```
+GET    /api/admin/samples/po-pdf/{n}        — download sample PO PDF (n=1,2,3)
+GET    /api/admin/samples/dp-pdf/{n}        — download sample DP PDF (n=1,2,3)
+POST   /api/admin/samples/amazon-image      — generate Amazon screenshot PNG
+                                              body: { orderId, shipments: [{deliveryDate, items:[{description,quantity}]}] }
+POST   /api/admin/samples/check-email       — manually trigger email ingestion
+                                              returns EmailImportResult
+```
+
+---
+
+## EmailImportResult shape
+
+```json
+{
+  "emailsProcessed": 2,
+  "ordersCreated": 1,
+  "itemsCreated": 5,
+  "duplicatesSkipped": 0,
+  "servicesSkipped": 1,
+  "amazonUpdates": 1,
+  "errors": 0,
+  "errorMessages": [],
+  "amazonUpdateDetails": ["Amazon order 114-3751791-7314618 → delivery 2026-05-20 — updated 1 item(s)"]
+}
+```
+
+`servicesSkipped` — count of PDFs whose `Order Category = SERVICES` — not created.
+
 ---
 
 ## API Response Format Notes
@@ -522,7 +646,6 @@ GET    /api/audit                   — returns { data: AuditLogDto[], total: N 
 ### 1. Login Page (`/login`)
 - Email + password form
 - JWT stored in localStorage + sent via `Authorization: Bearer` header
-- Also set as httpOnly cookie for server-side use
 - Redirect to Dashboard on success
 
 ### 2. Dashboard (`/dashboard`)
@@ -535,7 +658,7 @@ GET    /api/audit                   — returns { data: AuditLogDto[], total: N 
 ### 3. Tracker Page (`/tracker`)
 **Filter Bar:** Search | Purchase Type | Status (multi-select) | Vendor | Date range
 
-**Import bar (top right):** Import PO | Import DP | ↓ PO Template | ↓ DP Template | Check Email (manual IMAP trigger)
+**Import bar (top right):** Import PO | Import DP | ↓ PO Template | ↓ DP Template | Check Email (manual trigger)
 
 **Color coding:**
 - Green = HANDED_OVER / COMPLETED
@@ -543,16 +666,18 @@ GET    /api/audit                   — returns { data: AuditLogDto[], total: N 
 - Red = DELAYED
 - Grey = PENDING_DELIVERY or SERVICES_ONLY
 
-**Expandable rows:** Item-level lifecycle grid. SERVICES items show grey badge only — no timeline. Privileged roles (ADMIN, PROCUREMENT, VENDOR_MANAGEMENT) see date cells with inline edit + clear (×) button. IT/ASSET roles see only their specific action button.
+**Expandable rows:** Item-level lifecycle grid. SERVICES items show grey badge only — no timeline. Privileged roles see date cells with inline edit + clear (×) button. IT/ASSET roles see only their specific action button.
 
 ### 4. Order Detail Page (`/orders/:id`)
 - Full order header + items table with lifecycle columns
-- Audit trail section (loads `/api/audit?entityId=:id`)
+- Audit trail section
 - Action buttons per RBAC
 
 ### 5. Create Order (`/orders/new`)
 - Toggle: PO / DP
-- Each line item has: Category, Description, Qty, Unit Price, Purchase Link, Expected Delivery Date, Good Type (GOODS/SERVICES), Asset Tagging toggle, IT Config toggle
+- **Order Category toggle: GOODS / SERVICES** — SERVICES orders are not tracked for delivery
+- Amazon Order ID + Vendor Platform fields (for screenshot matching)
+- Each line item: Category, Description, Qty, Unit Price, Purchase Link, Expected Delivery Date, Good Type, Asset Tagging toggle, IT Config toggle
 
 ### 6. Reports Page (`/reports`)
 - Export Excel (filtered tracker report)
@@ -562,6 +687,32 @@ GET    /api/audit                   — returns { data: AuditLogDto[], total: N 
 
 ### 8. Audit Log (`/admin/audit`)
 - Table: Timestamp | User | Entity | Field | Old Value | New Value | Action
+
+### 9. Test Tools (`/admin/test-tools`) — Admin only
+- **Sample PDFs:** Download PO/DP variants 1–3. DP-2 is a SERVICES order (email ingestion skips it — shown in purple)
+- **Amazon Screenshot Generator:** Multi-shipment editor — each shipment has its own delivery date and item list. Download PNG to send as email attachment
+- **Create Test Order:** Quick form to create a GOODS order with Amazon Order ID for end-to-end screenshot testing
+- **Check Mailbox:** Manual email ingestion trigger; shows per-run stats including `servicesSkipped`
+
+### 10. Settings (`/admin/settings`) — Admin only
+- Enable/disable email polling toggle
+- Mailbox address
+- Poll interval (quick buttons: 5/10/15/30/60 min)
+- Subject keywords per type (PO / DP / Amazon) with live tag preview
+- Changes take effect immediately — no backend restart needed
+
+---
+
+## Sample PDF Variants
+
+| File | Category | Vendor | Items | Notes |
+|------|----------|--------|-------|-------|
+| PO-1 | GOODS | Amazon | 4 goods + 2 services | MacBook Pro, Keyboard, Mouse, USB-C Hub + AppleCare |
+| PO-2 | GOODS | Dell Technologies | 5 goods + 2 services | Server, Storage, Switch, UPS, Cables + Support |
+| PO-3 | GOODS | B&H Photo | 5 goods + 1 services | Cinema Camera, Lenses, Tripod, Cards + Training |
+| DP-1 | GOODS | Amazon | 5 goods + 1 services | Laptop, Mouse, Monitor, Keyboard, Webcam + Support · Amazon Order ID `114-3751791-7314618` · 3 shipment dates |
+| DP-2 | **SERVICES** | Microsoft | 6 services | M365, Azure, GitHub, DevOps · **Email ingestion SKIPS this order** |
+| DP-3 | GOODS | Cisco Systems | 3 goods + 4 services | Switches, Firewall, WiFi APs + SmartNet contracts |
 
 ---
 
@@ -588,6 +739,15 @@ app:
   jwt:
     secret: mbzuai-tracker-secret-key-minimum-256-bits-long-for-hs256
     expiration-ms: 28800000   # 8 hours
+  email-ingestion:
+    azure-tenant-id:     ${AZURE_TENANT_ID:}
+    azure-client-id:     ${AZURE_CLIENT_ID:}
+    azure-client-secret: ${AZURE_CLIENT_SECRET:}
+    # mailbox is now configurable at runtime via Settings UI (app_settings table)
+    # these @Value defaults are used only if the DB setting is blank
+    mailbox: ${EMAIL_MAILBOX:}
+    enabled: ${EMAIL_ENABLED:false}
+    poll-interval-minutes: ${EMAIL_POLL_MINUTES:10}
 ```
 
 ### JVM startup flags (used in start-java-backend.bat)
@@ -647,7 +807,7 @@ java \
 ### Rebuild after code changes
 ```bash
 cd server-java
-# Windows:
+# Windows — close MBZUAI-Backend window first (JAR is locked while running)
 set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21.0.10.7-hotspot
 set PATH=%JAVA_HOME%\bin;C:\Users\%USERNAME%\maven\apache-maven-3.9.6\bin;%PATH%
 mvn package -DskipTests
@@ -665,6 +825,11 @@ npm run dev    # runs on http://localhost:5173, proxies /api → localhost:3001
 - Database: `mbzuai_tracker`
 - Start: `net start postgresql-x64-18` or Services panel
 
+### Apply DB migrations (after adding new columns)
+```bash
+PGPASSWORD=postgres psql -U postgres -p 5433 -d mbzuai_tracker -f db/migrations.sql
+```
+
 ---
 
 ## Key Implementation Notes
@@ -675,23 +840,33 @@ npm run dev    # runs on http://localhost:5173, proxies /api → localhost:3001
 
 3. **SERVICES items** — `goodType = SERVICES` immediately sets status to `SERVICES_ONLY`. These items are excluded from lifecycle tracking, overdue checks, and KPI counts (counted as "complete" for order status).
 
-4. **Partial delivery** — `PUT /api/items/:id/receive` accepts optional `quantityReceived`. If less than total `quantity`, status becomes `PARTIALLY_DELIVERED`. Subsequent receive calls accumulate.
+4. **SERVICES orders** — `orderCategory = SERVICES` means the entire order is a services contract (no physical delivery). Email ingestion skips these — they are not created in the tracker.
 
-5. **DP line items** each carry their own `expectedDeliveryDate` — critical for the multi-date problem.
+5. **Partial delivery** — `PUT /api/items/:id/receive` accepts optional `quantityReceived`. If less than total `quantity`, status becomes `PARTIALLY_DELIVERED`. Subsequent receive calls accumulate.
 
-6. **Audit every field change** — `AuditService.log()` is called in every service method that modifies data.
+6. **DP line items** each carry their own `expectedDeliveryDate` — critical for the multi-date problem.
 
-7. **Notifications are dual-channel** — every event writes to DB (in-app) AND sends email via `NotificationService`. Recipients are determined by role, not individual user.
+7. **Amazon screenshot → per-item delivery date** — `AmazonScreenshotService` parses OCR text into shipment blocks. Each block contains "Arriving by DATE" + item descriptions. Order items are matched by substring/word-overlap. The matched item's `expectedDeliveryDate` is updated. The `vendorOrderId` on the order must match the Amazon Order ID in the screenshot/email.
 
-8. **Excel import** — rows in the same file grouped by Column A (PO/DP reference). Duplicate references are skipped (counted in `duplicatesSkipped`). Numbers with commas (e.g. `"4,800.00"`) are handled.
+8. **Amazon Order ID in PDF** — `SamplePdfGenerator` writes `Amazon Order ID:` in the PDF header. `PdfPoParser` reads it and sets `vendorOrderId` + `vendorPlatform = AMAZON` on the parsed order.
 
-9. **JSON boolean serialization** — all `is`-prefixed boolean fields use `@JsonProperty` to preserve the prefix in JSON output (Jackson strips `is` by default). Affected fields: `isActive`, `isRead`, `isDeleted`, `requiresAssetTagging`, `requiresITConfig`.
+9. **Runtime settings without restart** — `SettingsService` reads from `app_settings` table on every call. `DeliveryScheduler` checks DB-configured poll interval each minute tick. Changing settings in the UI takes effect within 60 seconds.
 
-10. **Lazy loading** — `spring.jpa.open-in-view=false` is set. All service methods that map entities to DTOs use `@Transactional(readOnly = true)`. Controllers that query and serialize directly also use `@Transactional(readOnly = true)`.
+10. **Subject keyword filtering** — `EmailIngestionService.isRelevantSubject()` reads all configured keywords at call time from `SettingsService`. Emails not matching any keyword are marked read and skipped without processing.
 
-11. **RBAC is enforced in service layer** — `ItemService` checks `userRole` before each action. `UserController`, `AuditController`, `ReportController` check role directly. No separate middleware — each method guards itself.
+11. **Audit every field change** — `AuditService.log()` is called in every service method that modifies data.
 
-12. **Color coding** in UI uses Tailwind: `bg-green-100 text-green-800` (done), `bg-yellow-100 text-yellow-800` (in-progress), `bg-red-100 text-red-800` (delayed), `bg-gray-100 text-gray-600` (pending/services).
+12. **Notifications are dual-channel** — every event writes to DB (in-app) AND sends email via `NotificationService`. Recipients are determined by role, not individual user.
+
+13. **Excel import** — rows in the same file grouped by Column A (PO/DP reference). Duplicate references are skipped (counted in `duplicatesSkipped`). Numbers with commas (e.g. `"4,800.00"`) are handled.
+
+14. **JSON boolean serialization** — all `is`-prefixed boolean fields use `@JsonProperty` to preserve the prefix in JSON output (Jackson strips `is` by default). Affected fields: `isActive`, `isRead`, `isDeleted`, `requiresAssetTagging`, `requiresITConfig`.
+
+15. **Lazy loading** — `spring.jpa.open-in-view=false` is set. All service methods that map entities to DTOs use `@Transactional(readOnly = true)`.
+
+16. **RBAC is enforced in service layer** — `ItemService` checks `userRole` before each action. `UserController`, `AuditController`, `ReportController`, `SettingsController` check role directly.
+
+17. **Hibernate ddl-auto: update limitation** — Hibernate adds columns to new tables but will NOT add columns to existing tables in some cases. Always run `db/migrations.sql` after adding new entity fields to an existing table.
 
 ---
 
@@ -705,6 +880,7 @@ npm run dev    # runs on http://localhost:5173, proxies /api → localhost:3001
 - [x] IT team marks configured → status updates
 - [x] Admin/Procurement/Vendor Mgmt can edit or clear any lifecycle date → status recalculates
 - [x] SERVICES items excluded from lifecycle tracking
+- [x] SERVICES orders skipped during email ingestion (orderCategory = SERVICES)
 - [x] PARTIALLY_DELIVERED status shown when partial qty received
 - [x] Admin can create/deactivate users and assign roles (7 roles including FINANCE)
 - [x] Tracker report exports to Excel
@@ -712,5 +888,11 @@ npm run dev    # runs on http://localhost:5173, proxies /api → localhost:3001
 - [x] In-app notification bell shows unread count
 - [x] Daily cron sends overdue alerts (07:00 + 08:00 Asia/Dubai)
 - [x] Excel import (PO + DP) with downloadable templates
+- [x] Email ingestion via Microsoft Graph API (O365 mailbox)
+- [x] Subject keyword filtering — only relevant emails processed
+- [x] Email settings configurable from UI without restart (mailbox, interval, keywords)
+- [x] Amazon screenshot OCR → per-item delivery date update by description matching
+- [x] Amazon Order ID on order (set at creation or via Edit Order modal)
+- [x] Sample PDFs with Order Category field (GOODS/SERVICES)
+- [x] Test Tools page: PDF download, Amazon screenshot generator, create test order, check email
 - [ ] PDF export (PDFBox dependency included, endpoint stubbed)
-- [ ] Oracle email IMAP ingestion (service scaffolded, requires IMAP credentials)

@@ -21,6 +21,9 @@ export default function EditOrderModal({ order, onClose, onSaved }: Props) {
   const [notes, setNotes]                     = useState(order.notes ?? '');
   const [totalValue, setTotalValue]           = useState(order.totalValue?.toString() ?? '');
   const [currency, setCurrency]               = useState(order.currency ?? 'AED');
+  const [orderCategory, setOrderCategory]     = useState<'GOODS' | 'SERVICES'>((order.orderCategory as any) ?? 'GOODS');
+  const [vendorOrderId, setVendorOrderId]     = useState(order.vendorOrderId ?? '');
+  const [vendorPlatform, setVendorPlatform]   = useState(order.vendorPlatform ?? '');
   // orderDate stored as ISO string — convert to yyyy-mm-dd for input
   const toInputDate = (iso?: string) => iso ? iso.slice(0, 10) : '';
   const [orderDate, setOrderDate]             = useState(toInputDate(order.orderDate));
@@ -39,6 +42,9 @@ export default function EditOrderModal({ order, onClose, onSaved }: Props) {
         currency,
         totalValue: totalValue ? parseFloat(totalValue) : undefined,
         orderDate,
+        orderCategory,
+        vendorOrderId: vendorOrderId || undefined,
+        vendorPlatform: vendorPlatform || undefined,
       });
       toast.success('Order updated');
       onSaved();
@@ -121,6 +127,69 @@ export default function EditOrderModal({ order, onClose, onSaved }: Props) {
               <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+            </div>
+
+            {/* Order Category */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Order Category</label>
+              <div className="flex items-center gap-2">
+                {(['GOODS', 'SERVICES'] as const).map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setOrderCategory(cat)}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-semibold border transition-colors ${orderCategory === cat
+                      ? cat === 'GOODS' ? 'bg-green-600 text-white border-green-600' : 'bg-purple-600 text-white border-purple-600'
+                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+                {orderCategory === 'SERVICES' && (
+                  <span className="text-xs text-purple-600">
+                    SERVICES orders are not tracked for physical delivery
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Amazon / vendor order tracking */}
+            <div className="md:col-span-2 pt-2 border-t border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                Amazon / Vendor Order Tracking
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Amazon Order ID
+                    <span className="ml-1 text-gray-400 font-normal text-xs">(e.g. 114-3751791-7314618)</span>
+                  </label>
+                  <input
+                    value={vendorOrderId}
+                    onChange={(e) => {
+                      setVendorOrderId(e.target.value);
+                      if (e.target.value && !vendorPlatform) setVendorPlatform('AMAZON');
+                    }}
+                    placeholder="114-XXXXXXX-XXXXXXX"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    When an Amazon screenshot is emailed with this order ID, delivery dates update automatically per item.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Vendor Platform</label>
+                  <select
+                    value={vendorPlatform}
+                    onChange={(e) => setVendorPlatform(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">— None —</option>
+                    <option value="AMAZON">Amazon</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
           </div>

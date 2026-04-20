@@ -49,6 +49,11 @@ public class Order {
     @Builder.Default
     private String status = "PENDING";
 
+    // GOODS = physical delivery tracked; SERVICES = contract/license, skipped by email ingestion
+    @Column(nullable = false)
+    @Builder.Default
+    private String orderCategory = "GOODS";
+
     @Column(columnDefinition = "TEXT")
     private String notes;
 

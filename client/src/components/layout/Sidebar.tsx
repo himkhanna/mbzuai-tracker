@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, List, PlusCircle,
-  BarChart2, Users, ClipboardList, LogOut, Languages,
+  BarChart2, Users, ClipboardList, LogOut, Languages, FlaskConical, Settings,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -145,6 +145,18 @@ export default function Sidebar() {
               <ClipboardList size={16} className="shrink-0" />
               {t('auditLog')}
             </NavLink>
+            {hasRole('ADMIN') && (
+              <NavLink to="/admin/test-tools" className={navLinkStyle} style={({ isActive }) => navInlineStyle(isActive)}>
+                <FlaskConical size={16} className="shrink-0" />
+                Test Tools
+              </NavLink>
+            )}
+            {hasRole('ADMIN') && (
+              <NavLink to="/admin/settings" className={navLinkStyle} style={({ isActive }) => navInlineStyle(isActive)}>
+                <Settings size={16} className="shrink-0" />
+                Settings
+              </NavLink>
+            )}
           </>
         )}
       </nav>

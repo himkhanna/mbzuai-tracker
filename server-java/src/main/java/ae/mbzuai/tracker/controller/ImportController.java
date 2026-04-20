@@ -2,6 +2,7 @@ package ae.mbzuai.tracker.controller;
 
 import ae.mbzuai.tracker.entity.User;
 import ae.mbzuai.tracker.service.ImportService;
+import ae.mbzuai.tracker.util.SamplePdfGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -19,6 +20,7 @@ import java.util.Map;
 public class ImportController {
 
     private final ImportService importService;
+    private final SamplePdfGenerator samplePdfGenerator;
 
     @GetMapping("/template/po")
     public ResponseEntity<byte[]> poTemplate() throws Exception {
@@ -54,5 +56,23 @@ public class ImportController {
             return ResponseEntity.status(403).build();
         }
         return ResponseEntity.ok(importService.importDP(file, user));
+    }
+
+    @GetMapping("/template/po-pdf")
+    public ResponseEntity<byte[]> poSamplePdf() throws Exception {
+        byte[] data = samplePdfGenerator.generateSamplePO();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=mbzuai-po-template.pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(data);
+    }
+
+    @GetMapping("/template/dp-pdf")
+    public ResponseEntity<byte[]> dpSamplePdf() throws Exception {
+        byte[] data = samplePdfGenerator.generateSampleDP();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=mbzuai-dp-template.pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(data);
     }
 }

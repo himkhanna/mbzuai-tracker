@@ -18,5 +18,8 @@ public class OrderRequest {
     private Double totalValue;
     private String currency;
     private String notes;
+    private String orderCategory;  // GOODS | SERVICES — defaults to GOODS
     private List<ItemRequest> items;
+    private String vendorPlatform;   // e.g. AMAZON
+    private String vendorOrderId;    // e.g. 114-3751791-7314618
 }
