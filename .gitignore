@@ -21,3 +21,7 @@ Thumbs.db
 
 # Claude memory (local only)
 .claude/
+
+# Local secrets — never commit
+secrets.bat
+.env.local
