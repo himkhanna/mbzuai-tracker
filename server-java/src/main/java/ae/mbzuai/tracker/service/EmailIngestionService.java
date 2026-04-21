@@ -3,9 +3,11 @@ package ae.mbzuai.tracker.service;
 import ae.mbzuai.tracker.dto.EmailImportResult;
 import ae.mbzuai.tracker.entity.Item;
 import ae.mbzuai.tracker.entity.Order;
+import ae.mbzuai.tracker.entity.ProcessedEmail;
 import ae.mbzuai.tracker.entity.User;
 import ae.mbzuai.tracker.repository.ItemRepository;
 import ae.mbzuai.tracker.repository.OrderRepository;
+import ae.mbzuai.tracker.repository.ProcessedEmailRepository;
 import ae.mbzuai.tracker.repository.UserRepository;
 import com.azure.identity.ClientSecretCredentialBuilder;
 import com.microsoft.graph.models.FileAttachment;
@@ -45,6 +47,7 @@ public class EmailIngestionService {
     private final OrderRepository orderRepository;
     private final ItemRepository itemRepository;
     private final UserRepository userRepository;
+    private final ProcessedEmailRepository processedEmailRepository;
     private final ImportService importService;
     private final PdfPoParser pdfPoParser;
     private final AmazonScreenshotService amazonScreenshotService;
@@ -92,19 +95,29 @@ public class EmailIngestionService {
             log.info("Found {} unread messages in {}", messages.size(), mailbox);
 
             for (Message msg : messages) {
+                String msgId = msg.getId();
                 String subject = msg.getSubject() != null ? msg.getSubject() : "";
+
+                // Skip if already processed (guards against missing Mail.ReadWrite permission)
+                if (processedEmailRepository.existsByMessageId(msgId)) {
+                    log.debug("Skipping already-processed message: '{}'", subject);
+                    continue;
+                }
+
                 if (!isRelevantSubject(subject)) {
                     log.info("Skipping email — subject not recognised as PO/DP/Amazon: '{}'", subject);
-                    markAsRead(graph, msg.getId()); // mark read so it won't be re-checked
+                    recordProcessed(msgId, subject);
+                    markAsRead(graph, msgId);
                     continue;
                 }
                 try {
                     processMessage(graph, msg, actor, acc);
-                    markAsRead(graph, msg.getId());
+                    recordProcessed(msgId, subject);
+                    markAsRead(graph, msgId);
                     acc.emailsProcessed++;
                 } catch (Exception e) {
-                    log.error("Failed processing message '{}': {}", msg.getSubject(), e.getMessage(), e);
-                    acc.addError("Email '" + msg.getSubject() + "': " + e.getMessage());
+                    log.error("Failed processing message '{}': {}", subject, e.getMessage(), e);
+                    acc.addError("Email '" + subject + "': " + e.getMessage());
                 }
             }
         } catch (Exception e) {
@@ -277,6 +290,14 @@ public class EmailIngestionService {
         } catch (Exception e) {
             log.warn("Failed to fetch attachments for message {}: {}", messageId, e.getMessage());
             return List.of();
+        }
+    }
+
+    @Transactional
+    public void recordProcessed(String messageId, String subject) {
+        if (!processedEmailRepository.existsByMessageId(messageId)) {
+            processedEmailRepository.save(ProcessedEmail.builder()
+                    .messageId(messageId).subject(subject).build());
         }
     }
 

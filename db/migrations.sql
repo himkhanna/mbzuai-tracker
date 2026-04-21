@@ -26,3 +26,13 @@ CREATE TABLE IF NOT EXISTS app_settings (
     value       TEXT,
     description TEXT
 );
+
+-- 2026-04-21: Processed email tracking (prevents reprocessing when Mail.ReadWrite is missing)
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS processed_emails (
+    id           VARCHAR(36) PRIMARY KEY,
+    message_id   VARCHAR(512) NOT NULL UNIQUE,
+    subject      VARCHAR(1000),
+    processed_at TIMESTAMP DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_processed_emails_message_id ON processed_emails(message_id);
