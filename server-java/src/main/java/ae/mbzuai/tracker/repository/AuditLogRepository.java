@@ -8,4 +8,5 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface AuditLogRepository extends JpaRepository<AuditLog, String>, JpaSpecificationExecutor<AuditLog> {
     Page<AuditLog> findAllByOrderByTimestampDesc(Pageable pageable);
+    void deleteByOrderId(String orderId);
 }

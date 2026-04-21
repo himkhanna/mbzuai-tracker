@@ -6,13 +6,17 @@ import {
   flexRender,
   createColumnHelper,
 } from '@tanstack/react-table';
-import { ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronLeft, Trash2, Package } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import type { Order, Role } from '../../types';
 import StatusBadge from '../shared/StatusBadge';
 import ItemLifecycleRow from './ItemLifecycleRow';
 import { formatDate } from '../../utils/dateHelpers';
 import { getOrderStatusRowColor } from '../../utils/statusColors';
+import apiClient from '../../api/client';
+
+const CAN_RECEIVE: Role[] = ['ADMIN', 'VENDOR_MANAGEMENT', 'PROCUREMENT', 'STORE'];
 
 interface OrderTableProps {
   orders: Order[];
@@ -25,6 +29,43 @@ const columnHelper = createColumnHelper<Order>();
 const OrderTable: React.FC<OrderTableProps> = ({ orders, onRefresh, userRole }) => {
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [receivingOrderId, setReceivingOrderId] = useState<string | null>(null);
+
+  async function markAllReceived(order: Order, e: React.MouseEvent) {
+    e.stopPropagation();
+    const pendingItems = order.items.filter(i =>
+      i.goodType !== 'SERVICES' &&
+      (i.status === 'PENDING_DELIVERY' || i.status === 'DELAYED' || i.status === 'PARTIALLY_DELIVERED')
+    );
+    if (!pendingItems.length) return;
+    setReceivingOrderId(order.id);
+    try {
+      await Promise.all(pendingItems.map(i => apiClient.put(`/items/${i.id}/receive`, {})));
+      toast.success(`All ${pendingItems.length} item(s) marked received`);
+      onRefresh();
+    } catch {
+      toast.error('Failed to mark some items received');
+      onRefresh();
+    } finally {
+      setReceivingOrderId(null);
+    }
+  }
+
+  async function handleDelete(order: Order, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!window.confirm(`Delete order ${order.reference}? This cannot be undone.`)) return;
+    setDeletingId(order.id);
+    try {
+      await apiClient.delete(`/orders/${order.id}`);
+      toast.success(`Order ${order.reference} deleted`);
+      onRefresh();
+    } catch {
+      toast.error('Failed to delete order');
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   const toggleRow = (id: string) => {
     setExpandedRows((prev) => {
@@ -72,6 +113,12 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders, onRefresh, userRole }) 
       ),
     }),
 
+    // Order Date
+    columnHelper.accessor('orderDate', {
+      header: 'Order Date',
+      cell: (info) => <span className="text-xs text-gray-500">{formatDate(info.getValue())}</span>,
+    }),
+
     // Vendor + End User combined
     columnHelper.display({
       id: 'people',
@@ -115,6 +162,22 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders, onRefresh, userRole }) 
       header: 'Status',
       cell: (info) => <StatusBadge status={info.getValue()} type="order" />,
     }),
+
+    // Delete (ADMIN only)
+    ...(userRole === 'ADMIN' ? [columnHelper.display({
+      id: 'delete',
+      header: '',
+      cell: ({ row }) => (
+        <button
+          onClick={(e) => handleDelete(row.original, e)}
+          disabled={deletingId === row.original.id}
+          className="p-1.5 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+          title="Delete order"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      ),
+    })] : []),
   ];
 
   const table = useReactTable({
@@ -130,12 +193,14 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders, onRefresh, userRole }) 
       <table className="w-full text-sm table-fixed">
         <colgroup>
           <col style={{ width: '40px' }} />
-          <col style={{ width: '130px' }} />
-          <col style={{ width: '60px' }} />
+          <col style={{ width: '120px' }} />
+          <col style={{ width: '56px' }} />
+          <col style={{ width: '96px' }} />
           <col /> {/* flex: takes remaining space */}
-          <col style={{ width: '64px' }} />
-          <col style={{ width: '106px' }} />
-          <col style={{ width: '150px' }} />
+          <col style={{ width: '60px' }} />
+          <col style={{ width: '96px' }} />
+          <col style={{ width: '140px' }} />
+          {userRole === 'ADMIN' && <col style={{ width: '40px' }} />}
         </colgroup>
         <thead className="bg-gray-50 border-b border-gray-200">
           {table.getHeaderGroups().map(hg => (
@@ -183,11 +248,36 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders, onRefresh, userRole }) 
                           No items in this order.
                         </div>
                       ) : (
-                        row.original.items.map((item, idx) => (
-                          <div key={item.id} className={idx > 0 ? 'border-t border-gray-200' : ''}>
-                            <ItemLifecycleRow item={item} userRole={userRole} onUpdate={onRefresh} />
-                          </div>
-                        ))
+                        <>
+                          {/* PO bulk-receive bar */}
+                          {row.original.type === 'PO' && CAN_RECEIVE.includes(userRole) && (() => {
+                            const pending = row.original.items.filter(i =>
+                              i.goodType !== 'SERVICES' &&
+                              (i.status === 'PENDING_DELIVERY' || i.status === 'DELAYED' || i.status === 'PARTIALLY_DELIVERED')
+                            );
+                            if (!pending.length) return null;
+                            return (
+                              <div className="flex items-center justify-between px-4 py-2 bg-blue-50 border-b border-blue-100">
+                                <span className="text-xs text-blue-700 font-medium">
+                                  {pending.length} item{pending.length > 1 ? 's' : ''} pending delivery
+                                </span>
+                                <button
+                                  onClick={(e) => markAllReceived(row.original, e)}
+                                  disabled={receivingOrderId === row.original.id}
+                                  className="flex items-center gap-1.5 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 disabled:opacity-60 transition-colors"
+                                >
+                                  <Package className="w-3.5 h-3.5" />
+                                  {receivingOrderId === row.original.id ? 'Marking…' : 'Mark All Received'}
+                                </button>
+                              </div>
+                            );
+                          })()}
+                          {row.original.items.map((item, idx) => (
+                            <div key={item.id} className={idx > 0 ? 'border-t border-gray-200' : ''}>
+                              <ItemLifecycleRow item={item} userRole={userRole} onUpdate={onRefresh} orderType={row.original.type} />
+                            </div>
+                          ))}
+                        </>
                       )}
                     </td>
                   </tr>

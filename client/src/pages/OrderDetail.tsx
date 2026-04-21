@@ -119,6 +119,7 @@ export default function OrderDetail() {
               key={item.id}
               item={item}
               userRole={user?.role || 'STORE'}
+              orderType={order.type}
               onUpdate={fetchOrder}
             />
           ))}

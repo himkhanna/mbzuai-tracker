@@ -11,6 +11,7 @@ interface ItemLifecycleRowProps {
   item: Item;
   userRole: Role;
   onUpdate: () => void;
+  orderType?: string;
 }
 
 const CAN_EDIT_ITEM: Role[] = ['ADMIN', 'VENDOR_MANAGEMENT', 'PROCUREMENT'];
@@ -116,7 +117,7 @@ const Arrow: React.FC<{ active: boolean }> = ({ active }) => (
   <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 mt-3 ${active ? 'text-gray-400' : 'text-gray-200'}`} />
 );
 
-const ItemLifecycleRow: React.FC<ItemLifecycleRowProps> = ({ item, userRole, onUpdate }) => {
+const ItemLifecycleRow: React.FC<ItemLifecycleRowProps> = ({ item, userRole, onUpdate, orderType }) => {
   const [loading, setLoading] = useState<string | null>(null);
   const { t } = useLanguage();
 
@@ -190,7 +191,7 @@ const ItemLifecycleRow: React.FC<ItemLifecycleRowProps> = ({ item, userRole, onU
   const isServices = item.goodType === 'SERVICES' || item.status === 'SERVICES_ONLY';
   const canEditAllDates = ['ADMIN', 'PROCUREMENT', 'VENDOR_MANAGEMENT'].includes(userRole);
 
-  const showReceive = !isServices && CAN_RECEIVE.includes(userRole) &&
+  const showReceive = !isServices && orderType !== 'PO' && CAN_RECEIVE.includes(userRole) &&
     (item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED' || item.status === 'PARTIALLY_DELIVERED');
   const showAssetTag = !isServices && CAN_ASSET_TAG.includes(userRole) && item.status === 'PENDING_ASSET_TAGGING';
   const showITConfig = !isServices && CAN_IT_CONFIG.includes(userRole) && item.status === 'PENDING_IT_CONFIG';

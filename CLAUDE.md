@@ -660,6 +660,8 @@ POST   /api/admin/samples/check-email       — manually trigger email ingestion
 
 **Import bar (top right):** Import PO | Import DP | ↓ PO Template | ↓ DP Template | Check Email (manual trigger)
 
+**Columns:** Expand | Reference | Type | Order Date | Vendor / End User | Items | Expected | Status | Delete (Admin only)
+
 **Color coding:**
 - Green = HANDED_OVER / COMPLETED
 - Amber = Any mid-stage (PARTIALLY_DELIVERED, STORED, PENDING_ASSET_TAGGING, etc.)
@@ -667,6 +669,10 @@ POST   /api/admin/samples/check-email       — manually trigger email ingestion
 - Grey = PENDING_DELIVERY or SERVICES_ONLY
 
 **Expandable rows:** Item-level lifecycle grid. SERVICES items show grey badge only — no timeline. Privileged roles see date cells with inline edit + clear (×) button. IT/ASSET roles see only their specific action button.
+
+**PO bulk receive:** When a PO row is expanded, a blue bar appears at the top showing "X items pending delivery" with a **Mark All Received** button — marks all GOODS items as received in one click. Per-item Mark Received buttons are hidden for PO orders (use the bulk button instead). DP orders retain per-item Mark Received buttons.
+
+**Admin delete:** A trash icon appears at the end of each row for ADMIN users. Clicking it hard-deletes the order (and all its items + audit logs) after a confirmation prompt. This is a permanent delete — use for test data cleanup.
 
 ### 4. Order Detail Page (`/orders/:id`)
 - Full order header + items table with lifecycle columns
@@ -677,7 +683,9 @@ POST   /api/admin/samples/check-email       — manually trigger email ingestion
 - Toggle: PO / DP
 - **Order Category toggle: GOODS / SERVICES** — SERVICES orders are not tracked for delivery
 - Amazon Order ID + Vendor Platform fields (for screenshot matching)
-- Each line item: Category, Description, Qty, Unit Price, Purchase Link, Expected Delivery Date, Good Type, Asset Tagging toggle, IT Config toggle
+- **PO orders:** Single "Expected Delivery Date" field in the Order Details header — applied to all items on submit. No per-item delivery date.
+- **DP orders:** Per-item "Expected Delivery" field — each line item can have a different date.
+- Each line item: Category, Description, Qty, Unit Price, Purchase Link, Asset Tagging toggle, IT Config toggle
 
 ### 6. Reports Page (`/reports`)
 - Export Excel (filtered tracker report)
@@ -844,7 +852,7 @@ PGPASSWORD=postgres psql -U postgres -p 5433 -d mbzuai_tracker -f db/migrations.
 
 5. **Partial delivery** — `PUT /api/items/:id/receive` accepts optional `quantityReceived`. If less than total `quantity`, status becomes `PARTIALLY_DELIVERED`. Subsequent receive calls accumulate.
 
-6. **DP line items** each carry their own `expectedDeliveryDate` — critical for the multi-date problem.
+6. **PO vs DP delivery dates** — PO orders have a single `expectedDeliveryDate` set at the order level and applied to all items on creation. DP line items each carry their own `expectedDeliveryDate` — critical for the multi-date/multi-shipment problem.
 
 7. **Amazon screenshot → per-item delivery date** — `AmazonScreenshotService` parses OCR text into shipment blocks. Each block contains "Arriving by DATE" + item descriptions. Order items are matched by substring/word-overlap. The matched item's `expectedDeliveryDate` is updated. The `vendorOrderId` on the order must match the Amazon Order ID in the screenshot/email.
 
@@ -867,6 +875,12 @@ PGPASSWORD=postgres psql -U postgres -p 5433 -d mbzuai_tracker -f db/migrations.
 16. **RBAC is enforced in service layer** — `ItemService` checks `userRole` before each action. `UserController`, `AuditController`, `ReportController`, `SettingsController` check role directly.
 
 17. **Hibernate ddl-auto: update limitation** — Hibernate adds columns to new tables but will NOT add columns to existing tables in some cases. Always run `db/migrations.sql` after adding new entity fields to an existing table.
+
+18. **Order hard delete** — `DELETE /api/orders/:id` (Admin only) is a hard delete. `OrderService.deleteOrder` explicitly calls `auditLogRepository.deleteByOrderId()` before `orderRepository.delete()` to satisfy the FK constraint on `audit_logs`. Items are cascade-deleted via `CascadeType.ALL` on the `Order.items` collection.
+
+19. **Email ingestion duplicate check** — `EmailIngestionService.createOrderFromParsed()` uses `orderRepository.existsByReference()` which checks ALL orders regardless of deletion status. This prevents the unique constraint violation when a previously-deleted order's reference is re-sent via email.
+
+20. **Processed emails deduplication** — `processed_emails` table records every Graph message ID after first processing. Even if `Mail.ReadWrite` is missing (email can't be marked read), re-polling won't reprocess the same email. To re-trigger a specific email, delete its row from `processed_emails`.
 
 ---
 
@@ -895,4 +909,9 @@ PGPASSWORD=postgres psql -U postgres -p 5433 -d mbzuai_tracker -f db/migrations.
 - [x] Amazon Order ID on order (set at creation or via Edit Order modal)
 - [x] Sample PDFs with Order Category field (GOODS/SERVICES)
 - [x] Test Tools page: PDF download, Amazon screenshot generator, create test order, check email
+- [x] PO single delivery date at order level; DP per-item delivery dates
+- [x] PO bulk "Mark All Received" button in tracker expandable row
+- [x] Order Date column visible in tracker list
+- [x] Admin hard-delete orders from tracker list (removes order + items + audit logs)
+- [x] Email ingestion deduplication via processed_emails table (works without Mail.ReadWrite)
 - [ ] PDF export (PDFBox dependency included, endpoint stubbed)

@@ -44,6 +44,7 @@ export default function CreateOrder() {
   const [totalValue, setTotalValue] = useState('');
 
   const [orderCategory, setOrderCategory] = useState<'GOODS' | 'SERVICES'>('GOODS');
+  const [poDeliveryDate, setPoDeliveryDate] = useState('');
   const [vendorPlatform, setVendorPlatform] = useState('');
   const [vendorOrderId, setVendorOrderId] = useState('');
 
@@ -110,7 +111,9 @@ export default function CreateOrder() {
           ...it,
           quantity: Number(it.quantity),
           unitPrice: it.unitPrice ? parseFloat(it.unitPrice) : undefined,
-          expectedDeliveryDate: it.expectedDeliveryDate || undefined,
+          expectedDeliveryDate: orderType === 'PO'
+            ? (poDeliveryDate || undefined)
+            : (it.expectedDeliveryDate || undefined),
         })),
       };
       const res = await apiClient.post('/orders', payload);
@@ -238,6 +241,13 @@ export default function CreateOrder() {
               <input value={supplier} onChange={(e) => setSupplier(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
+            {orderType === 'PO' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Expected Delivery Date</label>
+                <input type="date" value={poDeliveryDate} onChange={(e) => setPoDeliveryDate(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Total Value</label>
               <div className="flex gap-2">
@@ -336,11 +346,13 @@ export default function CreateOrder() {
                     <input type="number" step="0.01" value={item.unitPrice} onChange={(e) => updateItem(idx, 'unitPrice', e.target.value)}
                       className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Expected Delivery</label>
-                    <input type="date" value={item.expectedDeliveryDate} onChange={(e) => updateItem(idx, 'expectedDeliveryDate', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
+                  {orderType === 'DP' && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Expected Delivery</label>
+                      <input type="date" value={item.expectedDeliveryDate} onChange={(e) => updateItem(idx, 'expectedDeliveryDate', e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                  )}
                   <div className="md:col-span-3">
                     <label className="block text-xs font-medium text-gray-600 mb-1">Purchase Link</label>
                     <input type="url" value={item.purchaseLink} onChange={(e) => updateItem(idx, 'purchaseLink', e.target.value)}

@@ -202,7 +202,7 @@ public class EmailIngestionService {
             log.info("Order '{}' is category SERVICES — skipped (only GOODS orders are tracked)", parsed.reference);
             return;
         }
-        if (orderRepository.findByReferenceAndIsDeleted(parsed.reference, false).isPresent()) {
+        if (orderRepository.existsByReference(parsed.reference)) {
             acc.duplicatesSkipped++;
             log.info("Duplicate '{}' — skipped", parsed.reference);
             return;

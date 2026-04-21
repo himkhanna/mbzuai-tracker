@@ -6,6 +6,7 @@ import ae.mbzuai.tracker.dto.OrderRequest;
 import ae.mbzuai.tracker.entity.Item;
 import ae.mbzuai.tracker.entity.Order;
 import ae.mbzuai.tracker.entity.User;
+import ae.mbzuai.tracker.repository.AuditLogRepository;
 import ae.mbzuai.tracker.repository.ItemRepository;
 import ae.mbzuai.tracker.repository.OrderRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -27,6 +28,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final ItemRepository itemRepository;
+    private final AuditLogRepository auditLogRepository;
     private final StatusCalculator statusCalculator;
     private final AuditService auditService;
     private final NotificationService notificationService;
@@ -131,11 +133,10 @@ public class OrderService {
 
     @Transactional
     public void deleteOrder(String id, User actor) {
-        Order order = orderRepository.findByIdAndIsDeleted(id, false)
+        Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
-        order.setDeleted(true);
-        orderRepository.save(order);
-        auditService.log(actor, "order", order.getId(), "DELETE");
+        auditLogRepository.deleteByOrderId(id);
+        orderRepository.delete(order);
     }
 
     private Item buildItem(ae.mbzuai.tracker.dto.ItemRequest req, Order order) {

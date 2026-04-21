@@ -9,6 +9,7 @@ import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<Order, String>, JpaSpecificationExecutor<Order> {
     Optional<Order> findByReferenceAndIsDeleted(String reference, boolean isDeleted);
+    boolean existsByReference(String reference);
     Optional<Order> findByIdAndIsDeleted(String id, boolean isDeleted);
     Page<Order> findAllByIsDeleted(boolean isDeleted, Pageable pageable);
     Optional<Order> findByVendorOrderId(String vendorOrderId);
